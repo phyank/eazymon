@@ -1,7 +1,7 @@
 from io import StringIO
 import re,queue,threading,time
 
-MAIN_TITLE='syscall monitor'
+MAIN_TITLE='EazyMon syscall monitor'
 
 
 SYSCALL_INDEX_X64={

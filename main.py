@@ -110,9 +110,9 @@ class MainStatus:
         self.ignore_pids=""
         self.ignore_uids=""
 
-if "access control disabled" not in os.popen('xhost +').read():
-    print("Disable access control failed. Quit.")
-    exit(-1)
+# if "access control disabled" not in os.popen('xhost +').read():
+#     print("Disable access control failed. Quit.")
+#     exit(-1)
 
 mainStatus=MainStatus()
 filter=Filter()

@@ -33,6 +33,7 @@ class ScrolledList(Frame):
 
     def clean(self):
         self.listbox.delete(0,END)
+        self.stext.settext()
 
     def makeWidgets(self, options):
         sbar = Scrollbar(self)
@@ -159,6 +160,7 @@ class StartBox:
 
         self.top.title('Settings')
         self.top.resizable(0, 0)
+        self.top.protocol("WM_DELETE_WINDOW", self.config_quit)
 
         self.fuid = LabelFrame(self.top, text="用户黑名单")
         self.fpr = LabelFrame(self.top, text="进程黑名单")
@@ -199,6 +201,7 @@ class StartBox:
     def config_quit(self):
         self.top.destroy()
         if self.mode==FIRST_START:
+            self.mainStatus.quit_signal = True
             self.parent.destroy()
 
     def config_finish(self):
