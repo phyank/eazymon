@@ -182,7 +182,7 @@ asmlinkage long hooked_mkdir(struct pt_regs *regs) {
         char full_name[K_PATH_MAX];
 
 
-        long nbytes=strncpy_from_user(buff,(char*)(regs->bx),K_PATH_MAX);
+        long nbytes=strncpy_from_user(buff,(char*)(regs->di),K_PATH_MAX);
 
         get_fullname(buff,full_name);
 
@@ -239,7 +239,7 @@ asmlinkage long hooked_read(struct pt_regs *regs){
         //sprintf(jsonBuf+strlen(jsonBuf),"%l",regs->dx)
         ltostr(regs->dx,jsonBuf+strlen(jsonBuf));
         strcat(jsonBuf,"\",\"from_fd\":\"");
-        ltostr(regs->bx,jsonBuf+strlen(jsonBuf));
+        ltostr(regs->di,jsonBuf+strlen(jsonBuf));
         strcat(jsonBuf,"\"}");
 
         long ret=old_read(regs);
@@ -250,17 +250,17 @@ asmlinkage long hooked_read(struct pt_regs *regs){
 }
 
 
-asmlinkage long hooked_open(struct pt_regs *regs)
-{
-	long ret;
-  	static char* msg = "hooked sys_open(), file name: ";
-
-  	char buff[K_PATH_MAX];
-  	long nbytes=strncpy_from_user(buff,(char*)(regs->bx),K_PATH_MAX);
-  	printk("%s%s(%ld bytes)",msg,buff,nbytes);
-	ret = old_open(regs);
-  	return ret;
-}
+//asmlinkage long hooked_open(struct pt_regs *regs)
+//{
+//	long ret;
+//  	static char* msg = "hooked sys_open(), file name: ";
+//
+//  	char buff[K_PATH_MAX];
+//  	long nbytes=strncpy_from_user(buff,(char*)(regs->bx),K_PATH_MAX);
+//  	printk("%s%s(%ld bytes)",msg,buff,nbytes);
+//	ret = old_open(regs);
+//  	return ret;
+//}
 
 static void nl_data_ready (struct sk_buff * skb)
 {

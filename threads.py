@@ -87,7 +87,7 @@ class RefreshThread(threading.Thread):
 
                 if p.syscall_index == SYSCALL_INDEX_X64['read']:
                     p.pname = p.js['process_name']
-                    p.bytes = int(p.js['read_bytes'])
+                    p.bytes = int(p.js['read_bytes']) if p.js['read_bytes']!='' else -1
                     p.fd=int(p.js['from_fd']) if p.js['from_fd']!='' else -1024
                 elif p.syscall_index == SYSCALL_INDEX_X64['mkdir']:
                     p.path=str(p.js['full_name'])
