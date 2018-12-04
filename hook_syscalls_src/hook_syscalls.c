@@ -19,6 +19,7 @@
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
+#include <linux/fdtable.h>
 
 #include <net/sock.h>
 #include <net/netlink.h>
@@ -27,6 +28,8 @@
 #define K_PATH_MAX 512
 
 #define NETLINK_MY 25
+
+
 
 /*
 ** module macros
@@ -58,6 +61,11 @@ long long_pow(long a,int b){
         long c=1;
     for(;b>0;b--)c*=a;
     return c;}
+}
+
+size_t max_my(size_t a,size_t b){
+    if (a>b) return a;
+    else return b;
 }
 
 void ltostr(const long v,char* buf){
@@ -232,7 +240,10 @@ asmlinkage long hooked_read(struct pt_regs *regs){
 
         //printk("hooked sys_read(). process %s(%d) read %ld bytes from fd %ld.\n",current->comm,current->tgid,regs->dx,regs->bx);
         char jsonBuf[K_PATH_MAX];
+        char* filename;
         memset(jsonBuf,0,K_PATH_MAX);
+        int fd=regs->di;
+
         strcpy(jsonBuf,"{\"process_name\":\"");
         strcat(jsonBuf,current->comm);
         strcat(jsonBuf,"\",\"read_bytes\":\"");
@@ -240,6 +251,16 @@ asmlinkage long hooked_read(struct pt_regs *regs){
         ltostr(regs->dx,jsonBuf+strlen(jsonBuf));
         strcat(jsonBuf,"\",\"from_fd\":\"");
         ltostr(regs->di,jsonBuf+strlen(jsonBuf));
+        if (fd<NR_OPEN_DEFAULT) {
+	    struct files_struct *files=current->files;
+	    struct fdtable* main_fdt=files->fdt;
+            struct file* readFile=main_fdt->fd[fd];
+            struct dentry* de=readFile->f_path.dentry;
+            filename=de->d_name.name;
+            //printk(filename);
+            strcat(jsonBuf, "\",\"filename\":\"");
+            strncpy(jsonBuf+strlen(jsonBuf), filename,strnlen(filename,K_PATH_MAX));
+        }
         strcat(jsonBuf,"\"}");
 
         long ret=old_read(regs);
