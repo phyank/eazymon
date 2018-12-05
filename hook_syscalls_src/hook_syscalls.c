@@ -26,7 +26,7 @@
 
 #define MAX_LENGTH 512
 #define K_PATH_MAX 512
-
+#define K_FILENAME_MAX 255
 #define NETLINK_MY 25
 
 
@@ -98,6 +98,16 @@ void ltostr(const long v,char* buf){
 
 }
 
+inline char* my_strncpy(char* dst,const char* src,size_t count){
+    *dst='\0';
+    return strncat(dst,src,count);
+}
+
+inline int is_str_root_name(const char* str){
+    if (*str=='/') return 0;
+    else return 1;
+}
+
 void get_fullname(const char *pathname,char *fullname)
 {
 	struct dentry *parent_dentry = current->fs->pwd.dentry;
@@ -107,28 +117,82 @@ void get_fullname(const char *pathname,char *fullname)
 	memset(fullname,0,K_PATH_MAX);
 
 	// pathname could be a fullname
-	if (*(parent_dentry->d_iname)=='/'){
-	    strcpy(fullname,pathname);
+	if (*(parent_dentry->d_name.name)=='/'){
+	    my_strncpy(fullname,pathname,strnlen(pathname,K_PATH_MAX));
 	    return;
 	}
 
 	// pathname is not a fullname
 	for(;;){
-	if (unlikely(*(parent_dentry->d_iname)=='/'))
+	if (strcmp(parent_dentry->d_name.name,"/")==0)
 		buf[0]='\0';//reach the root dentry.
 	else
-	    strcpy(buf,parent_dentry->d_iname);
+	    my_strncpy(buf,parent_dentry->d_name.name,strnlen(parent_dentry->d_name.name,K_PATH_MAX));
     strcat(buf,"/");
     strcat(buf,fullname);
     strcpy(fullname,buf);
 
-    if (unlikely((parent_dentry == NULL) || (*(parent_dentry->d_iname)=='/')))
+    if ((parent_dentry == NULL) || (*(parent_dentry->d_name.name)=='/'))
         break;
 
     parent_dentry = parent_dentry->d_parent;
 	}
 
-	strcat(fullname,pathname);
+	strncat(fullname,pathname,K_PATH_MAX);
+
+	return;
+}
+
+void get_path(const struct dentry *de, char* fullname){
+    char buf[K_PATH_MAX];
+
+    memset(buf,0,K_PATH_MAX);
+
+
+    int log=0;
+
+    struct dentry *parent_dentry = de;
+
+	// pathname could be a fullname
+	if (*(parent_dentry->d_name.name)=='/'){
+	    my_strncpy(fullname,parent_dentry->d_name.name,strnlen(parent_dentry->d_name.name,K_PATH_MAX));
+	    return;
+	}
+
+	// pathname is not a fullname
+	my_strncpy(fullname, parent_dentry->d_name.name, strnlen(parent_dentry->d_name.name, K_PATH_MAX));
+	parent_dentry=parent_dentry->d_parent;
+    if (strncmp(parent_dentry->d_name.name,"/",K_FILENAME_MAX)==0|| strnlen(parent_dentry->d_name.name,K_FILENAME_MAX)==0||parent_dentry == parent_dentry->d_parent)
+        return;
+
+
+
+	for(;;){
+	//    printk("d_name.name:%s",parent_dentry->d_name.name);
+        if (strncmp(parent_dentry->d_name.name,"/",K_FILENAME_MAX)==0)
+            strcpy(buf,"");//reach the root dentry.
+        else {
+            my_strncpy(buf, parent_dentry->d_name.name, strnlen(parent_dentry->d_name.name, K_PATH_MAX));
+        }
+
+        strcat(buf,"/");
+        strncat(buf,fullname,200);
+        my_strncpy(fullname,buf,strnlen(buf,K_PATH_MAX));
+
+        if (strncmp(parent_dentry->d_name.name,"/",K_FILENAME_MAX)==0
+            || strnlen(parent_dentry->d_name.name,K_FILENAME_MAX)==0
+            ||parent_dentry == parent_dentry->d_parent)
+//            if (strncmp(parent_dentry->d_name.name, "/", K_FILENAME_MAX) == 0)
+//                printk("break for /\n");
+//            else if (strnlen(parent_dentry->d_name.name, K_FILENAME_MAX) == 0)
+//                printk("break for empty name\n");
+//            else if (parent_dentry == parent_dentry->d_parent)
+//                printk("break for self-parented");
+
+            break;
+
+        parent_dentry = parent_dentry->d_parent;
+	}
 
 	return;
 }
@@ -186,20 +250,20 @@ int send_audit_message_nl(const char* jsonBuf,int syscall_num,long ret){
 // hooked mkdir function
 asmlinkage long hooked_mkdir(struct pt_regs *regs) {
 
-        char buff[K_PATH_MAX];
+        char filename[K_PATH_MAX];
         char full_name[K_PATH_MAX];
 
 
-        long nbytes=strncpy_from_user(buff,(char*)(regs->di),K_PATH_MAX);
+        long nbytes=strncpy_from_user(filename,(char*)(regs->di),K_PATH_MAX);
 
-        get_fullname(buff,full_name);
+        get_fullname(filename,full_name);
 
         long ret=old_mkdir(regs);
 
         char jsonBuf[K_PATH_MAX];
         memset(jsonBuf,0,K_PATH_MAX);
         strcpy(jsonBuf,"{\"dir_name\":\"");
-        strcat(jsonBuf,buff);
+        strcat(jsonBuf,filename);
         strcat(jsonBuf,"\",\"full_name\":\"");
         strcat(jsonBuf,full_name);
         strcat(jsonBuf,"\",\"proc_name\":\"");
@@ -240,8 +304,9 @@ asmlinkage long hooked_read(struct pt_regs *regs){
 
         //printk("hooked sys_read(). process %s(%d) read %ld bytes from fd %ld.\n",current->comm,current->tgid,regs->dx,regs->bx);
         char jsonBuf[K_PATH_MAX];
-        char* filename;
+
         memset(jsonBuf,0,K_PATH_MAX);
+
         int fd=regs->di;
 
         strcpy(jsonBuf,"{\"process_name\":\"");
@@ -251,18 +316,40 @@ asmlinkage long hooked_read(struct pt_regs *regs){
         ltostr(regs->dx,jsonBuf+strlen(jsonBuf));
         strcat(jsonBuf,"\",\"from_fd\":\"");
         ltostr(regs->di,jsonBuf+strlen(jsonBuf));
-        if (fd<NR_OPEN_DEFAULT) {
-	    struct files_struct *files=current->files;
-	    struct fdtable* main_fdt=files->fdt;
+        // The following implementation in comment is discarded due to non-rcu reading.
+        /*if (fd<NR_OPEN_DEFAULT) {
+	        struct files_struct *files=current->files;
+	        struct fdtable* main_fdt=files->fdt;
             struct file* readFile=main_fdt->fd[fd];
             struct dentry* de=readFile->f_path.dentry;
             filename=de->d_name.name;
             //printk(filename);
             strcat(jsonBuf, "\",\"filename\":\"");
             strncpy(jsonBuf+strlen(jsonBuf), filename,strnlen(filename,K_PATH_MAX));
-        }
-        strcat(jsonBuf,"\"}");
+        }*/
 
+        struct file* readFile;
+        struct dentry *readFileDEntry;
+        char* filename;
+
+        rcu_read_lock();// The files_struct is protected with rcu mechanism. This primitive protect the reading process.
+
+        readFile=fcheck(fd);// the fcheck() API is rcu safe, while direct dereference is not.
+        if (readFile){
+            readFileDEntry=rcu_dereference(readFile->f_path.dentry);
+            filename=readFileDEntry->d_name.name;
+
+            strcat(jsonBuf, "\",\"filename\":\"");
+            my_strncpy(jsonBuf+strlen(jsonBuf),filename ,strnlen(filename,K_PATH_MAX));
+
+            strcat(jsonBuf, "\",\"path\":\"");
+            get_path(readFileDEntry,jsonBuf+strlen(jsonBuf));
+
+        }
+
+        rcu_read_unlock();
+
+        strcat(jsonBuf,"\"}");
         long ret=old_read(regs);
 
         send_audit_message_nl(jsonBuf,__NR_read,ret);

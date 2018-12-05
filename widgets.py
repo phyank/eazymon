@@ -59,7 +59,10 @@ class ScrolledList(Frame):
         o=""
         if p.syscall_index==SYSCALL_INDEX_X64['read']:
             o+="SYSCALL read() by process:%s"%p.pname
-            o+=", %d bytes from fd %d"%(p.bytes,p.fd)
+            if 'filename' in p.js:
+                o+=", %d bytes from %s(%d)"%(p.bytes,p.js['filename'],p.fd)
+            else:
+                o += ", %d bytes from %d" % (p.bytes, p.fd)
         elif p.syscall_index==SYSCALL_INDEX_X64['mkdir']:
             o += "SYSCALL mkdir()"
             o += ", user:%d, path:%s" % (p.uid, p.path)

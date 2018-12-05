@@ -56,7 +56,10 @@ class RefreshThread(threading.Thread):
             try:
                 msg=self.inQueue.get(timeout=0.5)
             except queue.Empty:
-                continue
+                if self.mainStatus.quit_signal:
+                    break
+                else:
+                    continue
             else:
                 msg = msg[16:]
                 l = struct.unpack('<qqIiiiiiq', msg[:48])
