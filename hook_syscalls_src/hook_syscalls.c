@@ -144,12 +144,9 @@ void get_fullname(const char *pathname,char *fullname)
 }
 
 void get_path(const struct dentry *de, char* fullname){
+
     char buf[K_PATH_MAX];
-
     memset(buf,0,K_PATH_MAX);
-
-
-    int log=0;
 
     struct dentry *parent_dentry = de;
 
@@ -168,7 +165,6 @@ void get_path(const struct dentry *de, char* fullname){
 
 
 	for(;;){
-	//    printk("d_name.name:%s",parent_dentry->d_name.name);
         if (strncmp(parent_dentry->d_name.name,"/",K_FILENAME_MAX)==0)
             strcpy(buf,"");//reach the root dentry.
         else {
